@@ -43,3 +43,59 @@ export const getPostById = async (req: Request, res: Response) => {
   if (!post) throw new HttpError(404, "Post tidak ditemukan");
   sendSuccess(res, 200, "Berhasil mengambil data post", post);
 };
+
+export const createBulkPosts = async (req: Request, res: Response) => {
+  if (!Array.isArray(req.body) || req.body.length === 0) {
+    throw new HttpError(400, "Body harus berupa array post dan tidak boleh kosong");
+  }
+
+  const postsData: {
+    title: string;
+    content: string | null;
+    published: boolean;
+    authorId: number;
+  }[] = [];
+
+  for (let i = 0; i < req.body.length; i++) {
+    const item = req.body[i];
+    const itemNum = i + 1;
+
+    if (!item || typeof item !== "object" || typeof item.title !== "string" || !item.title.trim()) {
+      throw new HttpError(400, `Item ke-${itemNum}: title wajib diisi`);
+    }
+
+    if (item.authorId === undefined || item.authorId === null || item.authorId === "") {
+      throw new HttpError(400, `Item ke-${itemNum}: authorId wajib diisi`);
+    }
+
+    const authorId = parseId(item.authorId);
+
+    postsData.push({
+      title: item.title,
+      content: typeof item.content === "string" ? item.content : null,
+      published: typeof item.published === "boolean" ? item.published : false,
+      authorId,
+    });
+  }
+
+  const uniqueAuthorIds = Array.from(new Set(postsData.map((p) => p.authorId)));
+
+  const existingUsers = await prisma.user.findMany({
+    where: {
+      id: { in: uniqueAuthorIds },
+    },
+    select: { id: true },
+  });
+
+  if (existingUsers.length !== uniqueAuthorIds.length) {
+    throw new HttpError(404, "Ada authorId yang tidak ditemukan");
+  }
+
+  const result = await prisma.post.createMany({
+    data: postsData,
+  });
+
+  sendSuccess(res, 201, `${result.count} post berhasil dibuat`, {
+    count: result.count,
+  });
+};

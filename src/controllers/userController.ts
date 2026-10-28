@@ -57,3 +57,68 @@ export const getUserById = async (req: Request, res: Response) => {
   if (!user) throw new HttpError(404, "User tidak ditemukan");
   sendSuccess(res, 200, "Berhasil mengambil data user", user);
 };
+
+export const getUserPosts = async (req: Request, res: Response) => {
+  const id = parseId(req.params.id);
+
+  let publishedFilter: boolean | undefined;
+  if (req.query.published !== undefined) {
+    if (req.query.published === "true") {
+      publishedFilter = true;
+    } else if (req.query.published === "false") {
+      publishedFilter = false;
+    } else {
+      throw new HttpError(400, "Query published harus true atau false");
+    }
+  }
+
+  let page = 1;
+  if (req.query.page !== undefined) {
+    const parsedPage = Number(req.query.page);
+    if (!Number.isNaN(parsedPage)) {
+      page = Math.max(1, Math.floor(parsedPage));
+    }
+  }
+
+  let limit = 10;
+  if (req.query.limit !== undefined) {
+    const parsedLimit = Number(req.query.limit);
+    if (!Number.isNaN(parsedLimit)) {
+      limit = Math.min(100, Math.max(1, Math.floor(parsedLimit)));
+    }
+  }
+
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) {
+    throw new HttpError(404, "User tidak ditemukan");
+  }
+
+  const where = {
+    authorId: id,
+    ...(publishedFilter !== undefined ? { published: publishedFilter } : {}),
+  };
+
+  const skip = (page - 1) * limit;
+
+  const [posts, total] = await Promise.all([
+    prisma.post.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.post.count({ where }),
+  ]);
+
+  const totalPages = Math.ceil(total / limit);
+
+  sendSuccess(res, 200, "Berhasil mengambil data post milik user", {
+    posts,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+    },
+  });
+};
