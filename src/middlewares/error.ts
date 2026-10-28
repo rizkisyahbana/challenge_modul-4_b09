@@ -1,8 +1,13 @@
 import type { NextFunction, Request, Response } from "express";
 import { HttpError } from "../utils/http-error";
 
-const fail = (res: Response, status: number, message: string): void => {
-  res.status(status).json({ status: false, message });
+const fail = (
+  res: Response,
+  status: number,
+  message: string,
+  errors?: unknown[],
+): void => {
+  res.status(status).json({ status: false, message, ...(errors ? { errors } : {}) });
 };
 
 export const notFound = (req: Request, res: Response): void => {
@@ -16,7 +21,7 @@ export const errorHandler = (
   _next: NextFunction,
 ): void => {
   if (err instanceof HttpError) {
-    fail(res, err.status, err.message);
+    fail(res, err.status, err.message, err.errors);
     return;
   }
 

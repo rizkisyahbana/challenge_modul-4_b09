@@ -4,25 +4,10 @@ import prisma from "../config/prisma";
 import { HttpError } from "../utils/http-error";
 import { parseId } from "../utils/parse";
 import { sendSuccess } from "../utils/response";
+import { validateCreateUser } from "../utils/validators";
 
 export const createUser = async (req: Request, res: Response) => {
-  const { email, name, password } = req.body ?? {};
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-  if (!email || !password) {
-    throw new HttpError(400, "Email dan password wajib diisi");
-  }
-
-  // Validasi Format Email (Challenge 6)
-  if (!emailRegex.test(email)) {
-    throw new HttpError(400, "Format email tidak valid");
-  }
-
-  // Validasi Panjang Password (Challenge 6)
-  if (password.length < 8) {
-    throw new HttpError(400, "Password minimal 8 karakter");
-  }
+  const { email, name, password } = validateCreateUser(req.body);
 
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
